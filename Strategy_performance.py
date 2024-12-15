@@ -57,116 +57,44 @@ filtered_data = data[(data['date'] >= pd.Timestamp(start_date)) & (data['date'] 
 if filtered_data.empty:
     st.error("No data available for the selected date range.")
 else:
-    # Display metrics with custom styling for headings on top, values below, and percentage change
+    # Display metrics with consistent spacing and alignment
     col1, col2, col3, col4 = st.columns([3, 2, 2, 3])  # Equal column widths for symmetry
 
-    # Styling for headings (light blue color and bold) and values below
-    heading_style = "<p style='color: blue; font-weight: bold; margin-bottom: 5px;'> {}</p>"
-    value_style = "<p style='font-size: 26px; margin-bottom: 0px;'> {}</p>"  # Reduced bottom margin for value
-    percentage_style = "<p style='font-size: 14px; font-weight: bold; color: {}; margin-top: 0px;'> {}</p>"  # Removed top margin for percentage change
-
-
-    # Function to color percentage changes (red for negative, green for positive)
-    def color_percentage(change_percent):
-        if change_percent < 0:
-            return "red", f"-{abs(change_percent):,.2f}%"
+    with col1:
+        st.metric("Total Account Value   ", f"₹{portfolio_value:,.0f}")
+    with col2:
+        st.metric("Day Change", f"₹{day_change:,.0f}", f"{filtered_data['day change %'].iloc[-1]:,.2f}%")
+    with col3:
+        st.metric("NIFTY50 Benchmark", f"{nifty50_value:,.0f}")
+    with col4:
+        if len(filtered_data) > 30:
+            month_change = filtered_data['current value'].iloc[-1] - filtered_data['current value'].iloc[-30]
+            month_change_percent = (month_change / filtered_data['current value'].iloc[-30] * 100) if \
+                filtered_data['current value'].iloc[-30] != 0 else 0
+            st.metric("Month Change", f"₹{month_change:,.0f}", f"{month_change_percent:.2f}%")
         else:
-            return "green", f"+{change_percent:,.2f}%"
+            st.metric("Month Change", "Insufficient Data")
 
-
-    # Ensure data is available before displaying
-    if portfolio_value is not None:
-        with col1:
-            st.markdown(heading_style.format("Total Account Value"), unsafe_allow_html=True)
-            st.markdown(value_style.format(f"₹{portfolio_value:,.0f}"), unsafe_allow_html=True)
-
-    if day_change is not None and 'day change %' in filtered_data.columns:
-        with col2:
-            st.markdown(heading_style.format("Day Change"), unsafe_allow_html=True)
-            st.markdown(value_style.format(f"₹{day_change:,.0f}"), unsafe_allow_html=True)
-            day_change_percent = filtered_data['day change %'].iloc[-1]
-            color, day_change_text = color_percentage(day_change_percent)
-            st.markdown(percentage_style.format(color, day_change_text), unsafe_allow_html=True)
-
-    if nifty50_value is not None:
-        with col3:
-            st.markdown(heading_style.format("NIFTY50"), unsafe_allow_html=True)
-            st.markdown(value_style.format(f"{nifty50_value:,.0f}"), unsafe_allow_html=True)
-
-    # Handle month change with sufficient data
-    if len(filtered_data) > 30:
-        month_change = filtered_data['current value'].iloc[-1] - filtered_data['current value'].iloc[-30]
-        month_change_percent = (month_change / filtered_data['current value'].iloc[-30] * 100) if \
-        filtered_data['current value'].iloc[-30] != 0 else None
-        with col4:
-            st.markdown(heading_style.format("Month Change"), unsafe_allow_html=True)
-            st.markdown(value_style.format(f"₹{month_change:,.0f}"), unsafe_allow_html=True)
-            if month_change_percent is not None:
-                color, month_change_text = color_percentage(month_change_percent)
-                st.markdown(percentage_style.format(color, month_change_text), unsafe_allow_html=True)
-            else:
-                st.markdown(percentage_style.format("gray", "No change"), unsafe_allow_html=True)
-    else:
-        with col4:
-            st.markdown(heading_style.format("Month Change"), unsafe_allow_html=True)
-            st.markdown(value_style.format("Insufficient Data"), unsafe_allow_html=True)
-
-    # Display "Model Live Chart" heading
     st.write("### Model Live Chart")
-
-    # Create NAV chart with light blue color
     nav_chart = alt.Chart(filtered_data).mark_line().encode(
         x='date:T',
-        y=alt.Y('nav:Q', scale=alt.Scale(zero=False)),  # NAV for the chart
-        color=alt.value('#6495ED')  # Set NAV line color to light blue
-    ).properties(
-        width=700,
-        height=400,
-        title="NAV over Time"
-    )
-
-    # Create Benchmark chart (Nifty50 Value) with light red color
+        y=alt.Y('nav:Q', scale=alt.Scale(zero=False)),  # Use NAV for the chart
+        color=alt.value('#1f77b4')
+    ).properties(width=700, height=400)
     benchmark_chart = alt.Chart(filtered_data).mark_line().encode(
         x='date:T',
         y=alt.Y('nifty50 value:Q', scale=alt.Scale(zero=False)),
-        color=alt.value('#E3735E')  # Set benchmark line color to light red
-    ).properties(
-        width=700,
-        height=400,
-        title="NIFTY50 Benchmark over Time"
-    )
+        color=alt.value('red')
+    ).properties(width=700, height=400)
+    st.altair_chart(nav_chart + benchmark_chart)
 
-    # Combine both charts
-    combined_chart = nav_chart + benchmark_chart
-
-    # Apply background color and other configurations to the combined chart
-    combined_chart = combined_chart.configure_view(
-        stroke=None,  # Remove the border around the chart
-        fill='#ededed'  # Set background color to light grey
-    )
-
-    # Display the combined chart in Streamlit
-    st.altair_chart(combined_chart, use_container_width=True)
-
-    # Display "Drawdown Live Chart" heading
     st.write("### Drawdown Live Chart")
-
-    # Create Drawdown chart with blue line color
     drawdown_chart = alt.Chart(filtered_data).mark_line().encode(
         x='date:T',
-        y=alt.Y('dd:Q', scale=alt.Scale(zero=False)),  # Drawdown for the chart
-        color=alt.value('#6495ED')  # Set Drawdown line color to blue
-    ).properties(
-        width=700,
-        height=400,
-        title="Drawdown over Time"
-    ).configure_view(
-        stroke=None,  # Remove the border around the chart
-        fill='#ededed'  # Set background color to light grey
-    )
-
-    # Display the Drawdown chart in Streamlit
-    st.altair_chart(drawdown_chart, use_container_width=True)
+        y=alt.Y('dd:Q', scale=alt.Scale(zero=False)),
+        color=alt.value('#ff7f0e')
+    ).properties(width=700, height=400)
+    st.altair_chart(drawdown_chart)
 
 # Performance Calculation
 st.sidebar.write("### Model Performance")
