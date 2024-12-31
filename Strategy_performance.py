@@ -6,7 +6,7 @@ import altair as alt
 # Replace with your actual Google Sheets CSV URL
 google_sheets_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTuyGRVZuafIk2s7moScIn5PAUcPYEyYIOOYJj54RXYUeugWmOP0iIToljSEMhHrg_Zp8Vab6YvBJDV/pub?output=csv"
 
-@st.cache_data
+@st.cache_data(ttl=0)  # Caching har baar bypass hoga
 def load_data(url):
     # Read the CSV and use the first row as the header
     data = pd.read_csv(url, header=0)
